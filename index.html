@@ -1,0 +1,404 @@
+<!doctype html>
+<html lang="bg">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#232D53">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="ΔU">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<title>ΔU калкулатор</title>
+<style>
+[hidden]{display:none!important}
+*,*::before,*::after{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0}
+:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+/* Layout: one calculator "window" ~380px wide, display on top, five fixed inputs, collapsible method panel below */
+:root{
+  /* RAL 5013 кобалтово синьо · RAL 1015 светла слонова кост · RAL 9011 графитено черно — една фиксирана тема */
+  --ral5013:#232D53; --ral1015:#EADEBD; --ral9011:#1C1C1C;
+  --bg:var(--ral5013); --panel:#1A2242; --fg:#F4EEDC; --muted:#B4BCD6;
+  --key:var(--ral1015); --key-2:#DCCFA9; --ink:var(--ral9011); --ink-muted:#5E5643; --line:var(--ral9011);
+  --accent:var(--ral5013); --accent-fg:var(--ral1015); --focus:#F2C14E;
+  --ok:#7FD69A; --warn:#F2C14E; --bad:#FF8A80; --bad-key:#B3261E;
+  --f-ui:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --f-label:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  color-scheme:light;
+}
+html,body{height:100%}
+body{background:var(--bg);color:var(--fg);font-family:var(--f-ui);font-size:15px;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:12px}
+.calc{max-width:380px;margin:0 auto;display:flex;flex-direction:column;gap:10px}
+.top{display:flex;align-items:center;justify-content:space-between}
+.top h1{font:600 20px/1 var(--f-ui);margin:0}
+.top .sub{font:500 12px var(--f-label);color:var(--muted);letter-spacing:.06em;text-transform:uppercase}
+
+/* display */
+.display{background:var(--panel);border:1px solid var(--ral9011);border-radius:10px;padding:12px 14px;display:flex;flex-direction:column;gap:6px}
+.d-head{display:flex;justify-content:space-between;align-items:center;font:500 13px var(--f-label);color:var(--muted);letter-spacing:.04em}
+.chip{font:600 12px var(--f-label);padding:2px 8px;border-radius:99px;border:1px solid currentColor}
+.chip.ok{color:var(--ok)}.chip.warn{color:var(--warn)}.chip.bad{color:var(--bad)}
+.big{font:600 52px/1.05 var(--f-ui);text-align:right;font-variant-numeric:tabular-nums;letter-spacing:-.01em;overflow-wrap:anywhere}
+.big small{font-size:26px;font-weight:500;color:var(--muted);margin-left:4px}
+.alts{display:flex;flex-direction:column;gap:2px;border-top:1px solid #3A4570;padding-top:6px}
+.alt{display:flex;justify-content:space-between;align-items:baseline;background:none;border:0;color:var(--muted);font:500 14px var(--f-ui);padding:3px 0;cursor:pointer;text-align:left}
+.alt b{font-weight:600;color:var(--fg);font-variant-numeric:tabular-nums}
+.alt:hover b,.alt:focus-visible b{color:var(--focus)}
+.meta{font:500 12px var(--f-label);color:var(--muted);text-align:right;font-variant-numeric:tabular-nums}
+
+/* inputs */
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.field{background:var(--key);border:1px solid var(--line);border-radius:8px;padding:6px 10px 7px;display:flex;flex-direction:column;gap:2px;min-width:0}
+.field:focus-within{border-color:var(--ral9011);box-shadow:0 0 0 2px var(--focus)}
+.field label,.lbl{font:600 12px var(--f-label);color:var(--ink-muted);letter-spacing:.03em}
+.field input,.field select{font:600 22px var(--f-ui);color:var(--ink);background:transparent;border:0;outline:0;width:100%;padding:0;font-variant-numeric:tabular-nums;min-width:0}
+#Udc{font-size:20px}
+.field select option{background:var(--key);color:var(--ink);font-size:17px}
+.field select option:checked{background:var(--accent);color:var(--accent-fg)}
+.field select{appearance:none;-webkit-appearance:none;cursor:pointer}
+.unit{font:500 13px var(--f-label);color:var(--ink-muted)}
+.inrow{display:flex;align-items:baseline;gap:6px}
+.seg{display:grid;grid-auto-flow:column;grid-auto-columns:1fr;gap:4px;background:var(--key-2);border:1px solid var(--line);border-radius:8px;padding:3px}
+.seg button{font:600 17px var(--f-ui);color:var(--ink);background:transparent;border:0;border-radius:6px;padding:9px 4px;cursor:pointer}
+.seg button[aria-pressed="true"]{background:var(--accent);color:var(--accent-fg)}
+.seg button:focus-visible,.step button:focus-visible,.adv-btn:focus-visible,.tabs button:focus-visible,.alt:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+.span2{grid-column:1/-1}
+.step{display:grid;grid-template-columns:52px 1fr 52px;gap:6px}
+.step button{font:500 26px/1 var(--f-ui);background:var(--key);color:var(--ink);border:1px solid var(--line);border-radius:8px;cursor:pointer}
+.step button:active{background:var(--key-2)}
+.step .field{align-items:center}
+.step input{text-align:center}
+.drop{background:none;border:0;color:var(--ink-muted);font:500 20px/1 var(--f-ui);padding:2px 4px;cursor:pointer;flex:none}
+.drop:disabled{cursor:not-allowed}
+.drop-sp{width:28px;flex:none}
+.pick{display:grid;grid-template-columns:repeat(4,1fr);gap:5px;background:var(--key-2);border:1px solid var(--line);border-radius:8px;padding:6px}
+.pick button{font:600 17px var(--f-ui);background:var(--key);color:var(--ink);border:1px solid var(--line);border-radius:6px;padding:10px 0;cursor:pointer;font-variant-numeric:tabular-nums}
+.pick button.on{background:var(--accent);color:var(--accent-fg);border-color:var(--ral9011)}
+.field.off{opacity:.5}
+.field.off input{cursor:not-allowed}
+.field.bad{border-color:var(--bad-key);box-shadow:0 0 0 2px var(--bad)}
+.err{color:var(--bad);font:500 13px var(--f-label);margin-top:-2px}
+
+/* advanced */
+.adv-btn{display:flex;justify-content:space-between;align-items:center;width:100%;background:var(--key);border:1px solid var(--line);border-radius:8px;color:var(--ink);font:600 13px var(--f-label);letter-spacing:.06em;text-transform:uppercase;padding:9px 12px;cursor:pointer}
+.adv-btn .car{transition:transform .2s}
+.adv-btn[aria-expanded="true"] .car{transform:rotate(180deg)}
+.adv{display:flex;flex-direction:column;gap:8px}
+.tabs{display:grid;grid-template-columns:repeat(3,1fr);border-bottom:1px solid #3A4570}
+.tabs button{background:none;border:0;border-bottom:3px solid transparent;color:var(--muted);font:600 14px var(--f-ui);padding:8px 2px;cursor:pointer}
+.tabs button[aria-selected="true"]{color:var(--fg);border-bottom-color:var(--ral1015)}
+.formula{font:500 13px var(--f-label);color:var(--muted);background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:7px 10px;line-height:1.4}
+.formula i{font-style:italic;color:var(--fg)}
+.field.sm input,.field.sm select{font-size:18px}
+.reset{justify-self:end;background:none;border:0;color:var(--ral1015);text-decoration:underline;font:600 13px var(--f-label);cursor:pointer;padding:4px 0}
+.foot{font:500 11px var(--f-label);color:var(--muted);text-align:center;line-height:1.4}
+@media (prefers-reduced-motion:reduce){.adv-btn .car{transition:none}}
+</style>
+</head>
+<body>
+
+
+<div class="calc">
+  <div class="top">
+    <h1>ΔU</h1>
+    <span class="sub" id="modeName">Бърз метод</span>
+  </div>
+
+  <section class="display" aria-live="polite">
+    <div class="d-head"><span id="mainLabel">Пад на напрежение</span><span class="chip ok" id="chip">≤ 3 %</span></div>
+    <div class="big" id="big">–</div>
+    <div class="alts" id="alts"></div>
+    <div class="meta" id="meta"></div>
+  </section>
+
+  <div class="grid">
+    <div class="field"><label for="P">Мощност P</label><div class="inrow"><input id="P" inputmode="decimal" enterkeyhint="next" autocomplete="off"><span class="unit">kW</span></div></div>
+    <div class="field"><label for="L">Дължина L</label><div class="inrow"><input id="L" inputmode="decimal" enterkeyhint="next" autocomplete="off"><span class="unit">m</span></div></div>
+    <div class="step span2">
+      <button type="button" id="sDown" tabindex="-1" aria-label="По-малко сечение">−</button>
+      <div class="field" id="sBox"><label for="S">Сечение S, mm²</label><div class="inrow"><span class="drop-sp" aria-hidden="true"></span><input id="S" inputmode="decimal" enterkeyhint="next" autocomplete="off"><button type="button" class="drop" id="sDrop" tabindex="-1" aria-label="Всички сечения" aria-expanded="false">▾</button></div></div>
+      <button type="button" id="sUp" tabindex="-1" aria-label="По-голямо сечение">+</button>
+    </div>
+    <div class="pick span2" id="sPick" hidden></div>
+    <div class="err span2" id="sErr" hidden></div>
+    <div class="seg" role="radiogroup" aria-label="Фази" id="ph">
+      <button type="button" data-v="1">1ф</button><button type="button" data-v="3">3ф</button><button type="button" data-v="0">DC</button>
+    </div>
+    <div class="seg" role="radiogroup" aria-label="Материал" id="mat">
+      <button type="button" data-v="CU">Cu</button><button type="button" data-v="AL">Al</button>
+    </div>
+    <div class="field span2" id="dcRow"><label for="Udc">Постоянно напрежение U<sub>dc</sub></label><div class="inrow"><input id="Udc" inputmode="decimal" enterkeyhint="next" autocomplete="off"><span class="unit">V</span><button type="button" class="drop" id="uDrop" tabindex="-1" aria-label="Типови напрежения" aria-expanded="false">▾</button><span class="unit" id="udcNote" style="white-space:nowrap"></span></div></div>
+    <div class="pick span2" id="uPick" hidden></div>
+    <div class="err span2" id="uErr" hidden></div>
+  </div>
+
+  <button type="button" class="adv-btn" id="advBtn" aria-expanded="false" aria-controls="adv"><span>Настройки</span><span class="car">▾</span></button>
+
+  <div class="adv" id="adv" hidden>
+    <div class="tabs" role="tablist">
+      <button role="tab" data-m="fast" id="t-fast">Бърз</button>
+      <button role="tab" data-m="iec" id="t-iec">IEC</button>
+      <button role="tab" data-m="full" id="t-full">Пълен</button>
+    </div>
+    <div id="panel"></div>
+    <button type="button" class="reset" id="reset">Стойности по подразбиране</button>
+  </div>
+
+  <p class="foot">Таблици r₀ / x₀ — Филкаб, Технически справочник · Бърз метод — Справочник по енергетика т.3, ф-ла 9.22, табл. 9.38 · v1.0</p>
+</div>
+
+<script>
+// ---- data from CALC-dU_2607_fix.xlsx (SOURCE sheet) ----
+const SECT=[1.5,2.5,4,6,10,16,25,35,50,70,95,120,150,185,240,300];
+const R_CU=[12.1,7.41,4.61,3.08,1.83,1.15,0.727,0.524,0.387,0.268,0.193,0.153,0.124,0.0993,0.0775,0.0623]; // клас 1, Ω/km @20°C
+const R_AL=[18.1,12.1,7.41,4.61,3.08,1.91,1.2,0.868,0.641,0.443,0.32,0.253,0.206,0.164,0.125,0.1];
+const X_MULTI=[0.115,0.108,0.102,0.097,0.093,0.09,0.086,0.083,0.082,0.08,0.08,0.078,0.078,0.077,0.076,0.075];
+const X_SINGLE=[0.145,0.138,0.132,0.128,0.123,0.119,0.115,0.112,0.11,0.106,0.105,0.102,0.102,0.1,0.097,0.095];
+
+// Справочник по енергетика т.3, табл. 9.38 — коефициент C
+const C_TAB={"3":{CU:77,AL:46},"1":{CU:12,AL:7.4},
+  "dc100":{CU:2.5,AL:1.57},"dc42":{CU:0.44,AL:0.269},"dc36":{CU:0.34,AL:0.20},"dc24":{CU:0.153,AL:0.092},"dc12":{CU:0.038,AL:0.023}};
+const UDC=[12,24,36,42,48,60,100,110,220];
+const cKey=()=>st.ph===0?"dc"+st.Udc:String(st.ph);
+const cDefault=()=>{const t=C_TAB[cKey()]; if(t) return {v:t[st.mat],calc:false};
+  const b=C_TAB.dc100[st.mat]*Math.pow(st.Udc/100,2); return {v:+b.toPrecision(3),calc:true}};
+const DEF={P:"6",L:"100",ph:3,mat:"CU",S:6,method:"fast",Udc:24,
+  cos:"0.9",n:"1",type:"multi",ki:true,
+  C:{},
+  rho:{CU:"0.0225",AL:"0.036"},lam:"0.08",U0:"230",t:"70"};
+const clone=o=>JSON.parse(JSON.stringify(o));
+let st=clone(DEF), advOpen=false;
+try{const s=JSON.parse(localStorage.getItem("dU-state-v3")||"null"); if(s){st=Object.assign(clone(DEF),s);st.C=Object.assign(clone(DEF.C),s.C||{});st.rho=Object.assign(clone(DEF.rho),s.rho||{});} advOpen=localStorage.getItem("dU-adv")==="1";}catch(e){}
+const save=()=>{try{localStorage.setItem("dU-state-v3",JSON.stringify(st));localStorage.setItem("dU-adv",advOpen?"1":"0")}catch(e){}};
+
+const num=v=>{const x=parseFloat(String(v).replace(",","."));return isFinite(x)?x:NaN};
+const fmt=(x,d=2)=>isFinite(x)?x.toFixed(d).replace(".",","):"–";
+const NAMES={fast:"Бърз метод",iec:"IEC 60364-5-52",full:"Пълен метод"};
+const SHORT={fast:"Бърз",iec:"IEC 60364-5-52",full:"Пълен метод"};
+
+function calc(){
+  const P=num(st.P),L=num(st.L),cos=num(st.cos),n=Math.max(1,num(st.n)||1);
+  const i=SECT.indexOf(st.S), S=st.S, cu=st.mat==="CU";
+  const r20=(cu?R_CU:R_AL)[i], x0=(st.type==="single"?X_SINGLE:X_MULTI)[i];
+  const tg=Math.tan(Math.acos(cos)), sin=Math.sqrt(1-cos*cos);
+  const one=st.ph===1, dc=st.ph===0, U=st.Udc;
+  const t=num(st.t), a=cu?0.00393:0.004, rt=r20*(1+a*(t-20));
+  const rho=num(st.rho[st.mat]);
+  const Cd=cDefault(), C=st.C[cKey()+st.mat]!==undefined?num(st.C[cKey()+st.mat]):Cd.v;
+  if(dc){
+    // DC: двупроводна линия, без реактанс, cosφ = 1
+    const I=P*1000/U/n;
+    const fast=P*L/(C*S*n);                       // ф-ла 9.22 с C за постоянен ток, k = 1
+    const u=2*rho*L/S*I, iec=100*u/U;             // Annex G с b = 2, cosφ = 1, sinφ = 0
+    const full=2*L*P*rt*100/(n*U*U);              // Филкаб: X = 0
+    return {fast,iec,full,I,k:1,r20,x0:0,rt,u,C,Ccalc:Cd.calc&&st.C[cKey()+st.mat]===undefined,valid:P>0&&L>0};
+  }
+  // current per cable, his convention 231 V / 693 V
+  const I=P*1000/((one?231:693)*cos)/n;
+  // 1. fast: ΔU% = k·P·L/(C·S)
+  const k=st.ki?1+(x0/r20)*tg:1;
+  const fast=k*P*L/(C*S*n);
+  // 2. IEC Annex G: u = b(ρ1·L/S·cosφ + λ·L·sinφ)·I ; Δu = 100·u/U0
+  const lam=num(st.lam)/1000, U0=num(st.U0), b=one?2:1;
+  const u=b*(rho*L/S*cos+lam*L*sin)*I;
+  const iec=100*u/U0;
+  // 3. full (Филкаб): R(t)=r20(1+α(t-20)); ΔU% = (1|2)·L·P·(R+X·tgφ)·100/(n·U²)
+  const full=(one?2:1)*L*P*(rt+x0*tg)*100/(n*Math.pow(one?231:400,2));
+  return {fast,iec,full,I,k,r20,x0,rt,u,C,valid:P>0&&L>0&&cos>0&&cos<=1};
+}
+
+const $=id=>document.getElementById(id);
+const Sin=$("S"), Uin=$("Udc");
+const fmtN=v=>String(v).replace(".",",");
+// ---- списък с всички стойности (вместо datalist, който филтрира) ----
+function openPick(pickId,dropId,vals,cur,unit,onPick){
+  const pk=$(pickId), dr=$(dropId);
+  if(!pk.hidden){closePicks();return}
+  closePicks();
+  pk.innerHTML=vals.map(v=>`<button type="button" data-v="${v}" class="${v===cur?"on":""}">${fmtN(v)}${unit}</button>`).join("");
+  pk.querySelectorAll("button").forEach(b=>b.addEventListener("click",()=>{onPick(+b.dataset.v);closePicks()}));
+  pk.hidden=false; dr.setAttribute("aria-expanded","true");
+}
+function closePicks(){["sPick","uPick"].forEach(id=>$(id).hidden=true);["sDrop","uDrop"].forEach(id=>$(id).setAttribute("aria-expanded","false"))}
+document.addEventListener("click",e=>{if(!e.target.closest(".pick,.drop")) closePicks()});
+
+function fieldHTML(id,label,val,unit,cls="sm"){return `<div class="field ${cls}"><label for="${id}">${label}</label><div class="inrow"><input id="${id}" inputmode="decimal" autocomplete="off" value="${val}">${unit?`<span class="unit">${unit}</span>`:""}</div></div>`}
+function segHTML(id,label,opts,cur){return `<div class="field sm" style="gap:5px"><span class="lbl">${label}</span><div class="seg" id="${id}" role="group" aria-label="${label}">${opts.map(([v,t])=>`<button type="button" data-v="${v}" aria-pressed="${String(v)===String(cur)}" style="font-size:14px;padding:6px 2px">${t}</button>`).join("")}</div></div>`}
+
+function renderPanel(){
+  const m=st.method, key=cKey()+st.mat, M=st.mat==="CU"?"Cu":"Al", dc=st.ph===0; let h="";
+  const cVal=st.C[key]!==undefined?st.C[key]:String(cDefault().v);
+  if(dc&&m==="fast"){
+    h=`<div class="formula"><i>ΔU% = P·L / (C·S)</i>, &nbsp;k = 1 (без реактанс)<br>C за двупроводна постояннотокова мрежа (табл. 9.38)</div>
+    <div class="grid" style="margin-top:8px">
+      ${fieldHTML("a-C",`C (DC ${st.Udc} V, ${M})`,cVal,"")}
+      ${fieldHTML("a-n","Кабели в паралел",st.n,"бр.")}
+    </div>`;
+  }else if(dc&&m==="iec"){
+    h=`<div class="formula"><i>u = 2·ρ₁·L/S·I</i>, &nbsp;<i>Δu = 100·u / U<sub>dc</sub></i><br>Annex G с b = 2, cosφ = 1, sinφ = 0</div>
+    <div class="grid" style="margin-top:8px">
+      ${fieldHTML("a-rho",`ρ₁ (${M})`,st.rho[st.mat],"Ω·mm²/m")}
+      ${fieldHTML("a-n","Кабели в паралел",st.n,"бр.")}
+    </div>`;
+  }else if(dc){
+    h=`<div class="formula"><i>ΔU% = 2·L·P·R·100 / U<sub>dc</sub>²</i><br><i>R = r₂₀·(1 + α(t−20))</i>, X = 0</div>
+    <div class="grid" style="margin-top:8px">
+      ${fieldHTML("a-t","Температура t",st.t,"°C")}
+      ${fieldHTML("a-n","Кабели в паралел",st.n,"бр.")}
+    </div>`;
+  }else if(m==="fast"){
+    h=`<div class="formula"><i>ΔU% = k·P·L / (C·S)</i>, &nbsp;<i>k = 1 + (x/r)·tgφ</i><br>C според фази и материал (табл. 9.38)</div>
+    <div class="grid" style="margin-top:8px">
+      ${fieldHTML("a-C",`C (${st.ph}ф, ${M})`,cVal,"")}
+      ${fieldHTML("a-cos","cos φ",st.cos,"")}
+      ${segHTML("a-ki","Корекция kᵢ",[["1","Вкл."],["0","Изкл."]],st.ki?"1":"0")}
+      ${segHTML("a-type","Изпълнение",[["multi","Многож."],["single","Едножил."]],st.type)}
+      ${fieldHTML("a-n","Кабели в паралел",st.n,"бр.")}
+    </div>`;
+  }else if(m==="iec"){
+    h=`<div class="formula"><i>u = b·(ρ₁·L/S·cosφ + λ·L·sinφ)·I</i><br><i>Δu = 100·u / U₀</i>, &nbsp;b = 1 (3ф), 2 (1ф)</div>
+    <div class="grid" style="margin-top:8px">
+      ${fieldHTML("a-rho",`ρ₁ (${st.mat==="CU"?"Cu":"Al"})`,st.rho[st.mat],"Ω·mm²/m")}
+      ${fieldHTML("a-lam","λ",st.lam,"mΩ/m")}
+      ${fieldHTML("a-cos","cos φ",st.cos,"")}
+      ${fieldHTML("a-U0","U₀ (фазно)",st.U0,"V")}
+      ${fieldHTML("a-n","Кабели в паралел",st.n,"бр.")}
+    </div>`;
+  }else{
+    h=`<div class="formula"><i>ΔU% = L·P·(R + X·tgφ)·100 / U²</i> (3ф, U = 400 V)<br>×2 и U = 231 V за 1ф; &nbsp;<i>R = r₂₀·(1 + α(t−20))</i></div>
+    <div class="grid" style="margin-top:8px">
+      ${fieldHTML("a-t","Температура t",st.t,"°C")}
+      ${fieldHTML("a-cos","cos φ",st.cos,"")}
+      ${segHTML("a-type","Изпълнение",[["multi","Многож."],["single","Едножил."]],st.type)}
+      ${fieldHTML("a-n","Кабели в паралел",st.n,"бр.")}
+    </div>`;
+  }
+  $("panel").innerHTML=h;
+  const bindIn=(id,fn)=>{const el=$(id); if(el) el.addEventListener("input",()=>{fn(el.value);update(false)})};
+  bindIn("a-C",v=>st.C[cKey()+st.mat]=v);
+  bindIn("a-cos",v=>st.cos=v);
+  bindIn("a-n",v=>st.n=v);
+  bindIn("a-rho",v=>st.rho[st.mat]=v);
+  bindIn("a-lam",v=>st.lam=v);
+  bindIn("a-U0",v=>st.U0=v);
+  bindIn("a-t",v=>st.t=v);
+  bindSeg("a-ki",v=>st.ki=v==="1");
+  bindSeg("a-type",v=>st.type=v);
+}
+function bindSeg(id,fn){const g=$(id); if(!g) return; g.querySelectorAll("button").forEach(b=>b.addEventListener("click",()=>{const had=g.contains(document.activeElement);fn(b.dataset.v);g.querySelectorAll("button").forEach(x=>x.setAttribute("aria-pressed",x===b));update(true);if(had)refocus(id)}))}
+
+function update(rerenderPanel){
+  // fixed inputs
+  $("ph").querySelectorAll("button").forEach(b=>b.setAttribute("aria-pressed",+b.dataset.v===st.ph));
+  $("mat").querySelectorAll("button").forEach(b=>b.setAttribute("aria-pressed",b.dataset.v===st.mat));
+  if(document.activeElement!==Sin) Sin.value=fmtN(st.S);
+  if(document.activeElement!==Uin) Uin.value=fmtN(st.Udc);
+  const dcOn=st.ph===0; Uin.disabled=!dcOn; $("uDrop").disabled=!dcOn; if(!dcOn) $("uPick").hidden=true; $("dcRow").classList.toggle("off",!dcOn);
+  if(!dcOn){$("uErr").hidden=true;$("dcRow").classList.remove("bad")}
+  document.querySelectorAll(".tabs button").forEach(b=>b.setAttribute("aria-selected",b.dataset.m===st.method));
+  $("modeName").textContent=NAMES[st.method];
+  $("adv").hidden=!advOpen; $("advBtn").setAttribute("aria-expanded",advOpen);
+  if(rerenderPanel&&advOpen) renderPanel();
+
+  const r=calc(), m=st.method, v=r[m];
+  const ok=r.valid&&isFinite(v)&&v>=0;
+  $("big").innerHTML=ok?`${fmt(v)}<small>%</small>`:"–";
+  const chip=$("chip");
+  if(ok){chip.hidden=false;const c=v<=3?"ok":v<=5?"warn":"bad";chip.className="chip "+c;chip.textContent=v<=3?"≤ 3 %":v<=5?"3–5 %":"> 5 %";} else chip.hidden=true;
+  $("mainLabel").textContent="ΔU · "+SHORT[m];
+  $("alts").innerHTML=["fast","iec","full"].filter(x=>x!==m).map(x=>`<button type="button" class="alt" data-m="${x}"><span>${SHORT[x]}</span><b>${ok?fmt(r[x])+" %":"–"}</b></button>`).join("");
+  $("alts").querySelectorAll(".alt").forEach(b=>b.addEventListener("click",()=>{st.method=b.dataset.m;update(true)}));
+  let meta=ok?`I = ${fmt(r.I,1)} A`:"Въведи P, L и cos φ";
+  if(ok&&m==="fast") meta+=(st.ph===0?"":` · k = ${fmt(r.k,3)}`)+` · C = ${String(r.C).replace(".",",")}`+(r.Ccalc?" (преизч.)":"");
+  $("udcNote").textContent=st.ph!==0?"само при DC":C_TAB["dc"+st.Udc]?"· табл. 9.38":"· C преизч. от 100 V";
+  document.querySelectorAll(".seg").forEach(g=>g.querySelectorAll("button").forEach(b=>b.tabIndex=b.getAttribute("aria-pressed")==="true"?0:-1));
+  if(ok&&m==="iec") meta+=` · u = ${fmt(r.u,2)} V`;
+  if(ok&&m==="full") meta+=` · R = ${fmt(r.rt,3)} · X = ${fmt(r.x0,3)} Ω/km`;
+  $("meta").textContent=meta;
+  save();
+}
+
+// fixed inputs wiring
+$("P").value=st.P; $("L").value=st.L;
+$("P").addEventListener("input",e=>{st.P=e.target.value;update(false)});
+$("L").addEventListener("input",e=>{st.L=e.target.value;update(false)});
+$("ph").querySelectorAll("button").forEach(b=>b.addEventListener("click",()=>{st.ph=+b.dataset.v;update(true)}));
+$("mat").querySelectorAll("button").forEach(b=>b.addEventListener("click",()=>{st.mat=b.dataset.v;update(true)}));
+// ---- сечение и Udc: свободно въвеждане с проверка ----
+function setErr(box,err,msg){$(box).classList.toggle("bad",!!msg);$(err).hidden=!msg;$(err).textContent=msg||""}
+function commitS(strict){
+  const raw=Sin.value.trim(), v=num(raw);
+  if(SECT.includes(v)){st.S=v;setErr("sBox","sErr",null);update(false);return true}
+  if(strict){setErr("sBox","sErr",`Няма сечение ${raw||"(празно)"} mm². Възможни: ${SECT.map(fmtN).join(", ")}.`);Sin.select()}
+  return false;
+}
+function commitU(strict){
+  const raw=Uin.value.trim(), v=num(raw);
+  if(v>0){st.Udc=v;setErr("dcRow","uErr",null);update(true);return true}
+  if(strict){setErr("dcRow","uErr","Въведи напрежение U<sub>dc</sub> над 0 V.".replace(/<\/?sub>/g,""));Uin.select()}
+  return false;
+}
+Sin.addEventListener("input",()=>commitS(false));
+Sin.addEventListener("change",()=>commitS(false));
+Sin.addEventListener("blur",()=>{if(!commitS(false)){const raw=Sin.value;Sin.value=fmtN(st.S);setErr("sBox","sErr",`Няма сечение ${raw} mm² — остава ${fmtN(st.S)} mm².`)}});
+Uin.addEventListener("input",()=>commitU(false));
+Uin.addEventListener("blur",()=>{if(!commitU(false)){Uin.value=fmtN(st.Udc);setErr("dcRow","uErr",null)}});
+$("sDrop").addEventListener("click",()=>openPick("sPick","sDrop",SECT,st.S,"",v=>{st.S=v;Sin.value=fmtN(v);setErr("sBox","sErr",null);update(false)}));
+$("uDrop").addEventListener("click",()=>openPick("uPick","uDrop",UDC,st.Udc," V",v=>{st.Udc=v;Uin.value=fmtN(v);setErr("dcRow","uErr",null);update(true)}));
+const stepS=d=>{const i=SECT.indexOf(st.S)+d; if(i>=0&&i<SECT.length){st.S=SECT[i];Sin.value=fmtN(st.S);setErr("sBox","sErr",null);update(false)}};
+
+// ---- Enter → следващото поле, като в Excel ----
+const pressed=g=>g.querySelector('button[aria-pressed="true"]')||g.querySelector("button");
+function order(){
+  const L=[$("P"),$("L"),Sin,pressed($("ph")),pressed($("mat"))];
+  if(st.ph===0) L.push(Uin);
+  if(advOpen) $("panel").querySelectorAll("input, .seg").forEach(el=>L.push(el.classList.contains("seg")?pressed(el):el));
+  return L;
+}
+function goNext(t){
+  const L=order(); let i=L.indexOf(t);
+  if(i<0){const g=t.closest&&t.closest(".seg"); if(g) i=L.indexOf(pressed(g));}
+  const n=L[(i+1)%L.length]; n.focus(); if(n.tagName==="INPUT") n.select();
+}
+function refocus(groupId){const g=$(groupId); if(g) pressed(g).focus()}
+const KEYMAP={"1":"1","3":"3","d":"0","д":"0","c":"CU","ц":"CU","a":"AL","а":"AL"};
+document.addEventListener("keydown",e=>{
+  const t=e.target, g=t.closest&&t.closest(".seg");
+  if(g&&t.tagName==="BUTTON"){
+    const btns=[...g.querySelectorAll("button")], i=btns.indexOf(t); let pick=null;
+    if(e.key==="ArrowRight"||e.key==="ArrowDown") pick=btns[(i+1)%btns.length];
+    else if(e.key==="ArrowLeft"||e.key==="ArrowUp") pick=btns[(i-1+btns.length)%btns.length];
+    else { const v=KEYMAP[e.key.toLowerCase()]; if(v!==undefined) pick=btns.find(b=>b.dataset.v===v)||null; }
+    if(pick){e.preventDefault();const id=g.id;pick.click();refocus(id);return}
+    if(e.key==="Enter"){e.preventDefault();goNext(t)}
+    return;
+  }
+  if(e.key==="Escape") closePicks();
+  if(e.key==="Enter"&&t.tagName==="INPUT"){
+    closePicks();
+    e.preventDefault();
+    if(t===Sin&&!commitS(true)) return;
+    if(t===Uin&&!commitU(true)) return;
+    goNext(t);
+  }
+});
+// стойността се маркира при влизане в полето: пишеш отгоре или Enter я приема
+document.addEventListener("focusin",e=>{const t=e.target; if(t.tagName==="INPUT") setTimeout(()=>{try{t.select()}catch(_){}} ,0)});
+$("sDown").addEventListener("click",()=>stepS(-1));
+$("sUp").addEventListener("click",()=>stepS(1));
+$("advBtn").addEventListener("click",()=>{advOpen=!advOpen;update(true)});
+document.querySelectorAll(".tabs button").forEach(b=>b.addEventListener("click",()=>{st.method=b.dataset.m;update(true)}));
+$("reset").addEventListener("click",()=>{const keep={P:st.P,L:st.L,ph:st.ph,mat:st.mat,S:st.S,method:st.method,Udc:st.Udc};st=Object.assign(clone(DEF),keep);update(true)});
+update(true);
+</script>
+
+<script>
+if("serviceWorker" in navigator){window.addEventListener("load",()=>{navigator.serviceWorker.register("sw.js").catch(()=>{})})}
+</script>
+</body>
+</html>
